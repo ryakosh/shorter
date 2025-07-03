@@ -10,7 +10,7 @@ class InvalidConfig(Exception):
 
 
 app = FastAPI()
-SQL_URL = os.getenv("SHORTENER_SQLITE_URL")
+SQL_URL = os.getenv("SHORTENER_SQL_URL")
 
 if SQL_URL is None:
     raise InvalidConfig("Please set 'SHORTENER_SQLITE_URL'")
