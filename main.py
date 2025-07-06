@@ -1,9 +1,8 @@
-from typing import Annotated
-
 from fastapi import FastAPI
 from sqlalchemy import Engine
-from sqlmodel import Field, SQLModel, create_engine
+from sqlmodel import SQLModel, create_engine
 
+from .models import URL
 from .deps import get_settings
 
 
@@ -12,19 +11,6 @@ settings = get_settings()
 engine = create_engine(
     settings.shorter_sql_url, connect_args={"check_same_thread": False}
 )
-
-
-class URLBase(SQLModel):
-    url: Annotated[str, Field(max_length=2083)]
-
-
-class URL(URLBase, table=True):
-    id: Annotated[int | None, Field(primary_key=True)] = None
-    s_url: str
-
-
-class URLCreate(URLBase):
-    pass
 
 
 def init_db(engine: Engine):
