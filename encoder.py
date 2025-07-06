@@ -1,6 +1,3 @@
-ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
-
-
 def build_encoder(alphabet: str):
     """Build an encoder using the provided 'alphabet'.
 

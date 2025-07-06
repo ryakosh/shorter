@@ -1,21 +1,17 @@
-import os
 from typing import Annotated
 
 from fastapi import FastAPI
+from sqlalchemy import Engine
 from sqlmodel import Field, SQLModel, create_engine
 
-
-class InvalidConfig(Exception):
-    pass
+from .deps import get_settings
 
 
 app = FastAPI()
-SQL_URL = os.getenv("SHORTENER_SQL_URL")
-
-if SQL_URL is None:
-    raise InvalidConfig("Please set 'SHORTENER_SQLITE_URL'")
-
-SQL_ENGINE = create_engine(SQL_URL, connect_args={"check_same_thread": False})
+settings = get_settings()
+engine = create_engine(
+    settings.shorter_sql_url, connect_args={"check_same_thread": False}
+)
 
 
 class URLBase(SQLModel):
@@ -31,10 +27,10 @@ class URLCreate(URLBase):
     pass
 
 
-def init_db():
-    SQLModel.metadata.create_all(SQL_ENGINE)
+def init_db(engine: Engine):
+    SQLModel.metadata.create_all(engine)
 
 
 @app.on_event("startup")  # TODO: Switch to Lifespans
 async def on_startup():
-    init_db()
+    init_db(engine)
