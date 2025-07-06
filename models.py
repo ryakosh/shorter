@@ -1,6 +1,7 @@
 from typing import Annotated
 
-from sqlmodel import Field, SQLModel
+from pydantic import EmailStr
+from sqlmodel import Field, Relationship, SQLModel
 
 
 class URLBase(SQLModel):
@@ -11,6 +12,25 @@ class URL(URLBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
     s_url: str
 
+    user_id = Annotated[int, Field(foreign_key="user.id")]
+    user: Annotated["User", Relationship(back_populates="urls")]
+
 
 class URLCreate(URLBase):
+    pass
+
+
+class UserBase(SQLModel):
+    email: EmailStr
+    password: Annotated[str, Field(min_length=8)]
+
+
+class User(UserBase, table=True):
+    id: Annotated[int | None, Field(primary_key=True)] = None
+    is_active: bool = False
+
+    urls: Annotated[list[URL] | None, Relationship(back_populates="user")]
+
+
+class UserCreate(UserBase):
     pass
