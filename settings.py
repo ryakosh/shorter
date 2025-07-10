@@ -13,5 +13,8 @@ class Settings(BaseSettings):
     shorter_alphabet: str = (
         "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
     )
+    shorter_secret: str
+    shorter_secret_alg: str
+    shorter_token_expires_mins: int
 
     model_config = SettingsConfigDict(env_file=".env")
