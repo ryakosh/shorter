@@ -5,16 +5,18 @@ class Settings(BaseSettings):
     """API settings.
 
     Attributes:
-        shorter_sql_url (str): SQL URL to use for communication with the DB.
-        shorter_alphabet (str): Alphabet to use for short link generation.
+        sql_url (str): SQL URL to use for communication with the DB.
+        alphabet (str): Alphabet to use for short link generation.
+        secret (str): Secret used for signing tokens.
+        secret_alg (str): The algorithm that 'secret' uses.
+        token_expires_mins (int): Sets the minutes after which the token is
+        considered expired.
     """
 
-    shorter_sql_url: str = "sqlite:///database.db"
-    shorter_alphabet: str = (
-        "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
-    )
-    shorter_secret: str
-    shorter_secret_alg: str
-    shorter_token_expires_mins: int
+    sql_url: str = "sqlite:///database.db"
+    alphabet: str = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_"
+    secret: str
+    secret_alg: str
+    token_expires_mins: int
 
-    model_config = SettingsConfigDict(env_file=".env")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="SHORTER_")

@@ -18,9 +18,7 @@ from .deps import get_settings
 
 app = FastAPI()
 settings = get_settings()
-engine = create_engine(
-    settings.shorter_sql_url, connect_args={"check_same_thread": False}
-)
+engine = create_engine(settings.sql_url, connect_args={"check_same_thread": False})
 pass_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -46,53 +44,119 @@ InvalidUsernamePassword = HTTPException(
 )
 
 
-def verify_password(plain: str, hashed: str) -> bool:
+def verify_passwd(plain: str, hashed: str) -> bool:
+    """Compare a plain password against a provided hashed version.
+
+    Args:
+        plain (str): The plain passowrd to compare.
+        hashed (str): The hashed version of the password to compare against.
+
+    Returns:
+        bool: 'True' if 'hashed' is the hashed version of the 'plain', False otherwise."""
+
     return pass_ctx.verify(plain, hashed)
 
 
-def get_password_hash(plain: str) -> str:
+def hash_passwd(plain: str) -> str:
+    """Hash the provided password.
+
+    Args:
+        plain (str): The plain password to be hashed.
+
+    Returns:
+        str: The hashed password.
+    """
+
     return pass_ctx.hash(plain)
 
 
 def get_user(engine: Engine, username: str) -> User | None:
+    """Get user using the provided criteria.
+
+    Args:
+        engine: The database engine.
+        username (str): User's username.
+
+    Returns:
+        User: If user was found.
+        None: If user was not found.
+
+    """
+
     with Session(engine) as session:
         user = session.exec(select(User).where(User.username == username)).first()
         return user
 
 
-def authenticate_user(engine: Engine, username: str, password: str):
+def authenticate_user(engine: Engine, username: str, passwd: str) -> User | None:
+    """Authenticate the user using the provided username and password.
+
+    Args:
+        engine (Engine): The database engine.
+        username (str): User's username.
+        password (str): User's password.
+
+    Returns:
+        User: If authentication was successful.
+        None: If authentication was not successful.
+    """
+
     user = get_user(engine, username)
-    if not user:
-        return False
-    if not verify_password(password, user.password):
-        return False
+
+    if user is None or verify_passwd(passwd, user.hashed_passwd):
+        return None
     return user
 
 
-def gen_access_token(data: dict, expires_delta: timedelta):
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + expires_delta
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(
-        to_encode, settings.shorter_secret, settings.shorter_secret_alg
-    )
+def gen_access_token(payload: dict, expires_after: timedelta) -> str:
+    """Generate a fresh access token for the user.
+
+    Args:
+        payload (dict): The payload to encode.
+        expires_after (timedelta): Calculates and sets the 'exp' JWT claim.
+
+    Returns:
+        str: The encoded JWT.
+    """
+
+    payload_cpy = payload.copy()
+    payload_cpy.update({"exp": datetime.now(timezone.utc) + expires_after})
+    encoded_jwt = jwt.encode(payload_cpy, settings.secret, settings.secret_alg)
 
     return encoded_jwt
 
 
 async def get_engine() -> Engine:
+    """Get the database engine.
+
+    Returns:
+        Engine: The database engine.
+    """
+
     return engine
 
 
 async def get_current_user(
     engine: Annotated[Engine, Depends(get_engine)],
     token: Annotated[str, Depends(oauth2_scheme)],
-) -> User | None:
+) -> User:
+    """Get the current authenticated user.
+
+    Args:
+        engine (Engine): The database engine.
+        token (str): User's token.
+
+    Returns:
+        User: If token is valid and user exists.
+
+    Raises:
+        HTTPException: If token is invalid or user does not exist.
+    """
+
     try:
-        payload = jwt.decode(
-            token, settings.shorter_secret, algorithms=[settings.shorter_secret_alg]
-        )
+        payload = jwt.decode(token, settings.secret, algorithms=[settings.secret_alg])
         username = payload.get("sub")
+
         if username is None:
             raise CredentialsException
         token_data = TokenData(username=username)
@@ -108,6 +172,18 @@ async def get_current_user(
 async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ) -> User:
+    """Get the current active user.
+
+    Args:
+        current_user (User): The current authenticated user.
+
+    Returns:
+        User: If user is activated.
+
+    Raises:
+        HTTPException: If user is not activated.
+    """
+
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
 
@@ -121,11 +197,11 @@ async def login_for_access_token(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Token:
     user = authenticate_user(engine, form_data.username, form_data.password)
-    if not user:
+    if user is None:
         raise InvalidUsernamePassword
-    expires_delta = timedelta(minutes=settings.shorter_token_expires_mins)
+    expires_delta = timedelta(minutes=settings.token_expires_mins)
     access_token = gen_access_token(
-        data={"sub": user.username}, expires_delta=expires_delta
+        payload={"sub": user.username}, expires_after=expires_delta
     )
 
     return Token(access_token=access_token, token_type="bearer")
@@ -139,6 +215,12 @@ async def read_users_me(
 
 
 def init_db(engine: Engine):
+    """Initialize the database.
+
+    Args:
+        engine (Engine): The database engine.
+    """
+
     SQLModel.metadata.create_all(engine)
 
 

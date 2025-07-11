@@ -24,7 +24,7 @@ class URLCreate(URLBase):
 class UserBase(SQLModel):
     email: EmailStr
     username: str
-    password: Annotated[str, Field(min_length=8)]
+    hashed_passwd: Annotated[str, Field(min_length=8)]
 
 
 class User(UserBase, table=True):
