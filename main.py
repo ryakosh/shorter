@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI
@@ -10,7 +11,14 @@ from .db import get_engine
 from .auth import get_current_active_user
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    engine = get_engine()
+    init_db(engine)
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/users/me/", response_model=UserRead)
@@ -28,9 +36,3 @@ def init_db(engine: Engine):
     """
 
     SQLModel.metadata.create_all(engine)
-
-
-@app.on_event("startup")  # TODO: Switch to Lifespans
-async def on_startup():
-    engine = get_engine()
-    init_db(engine)
