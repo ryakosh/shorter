@@ -3,18 +3,20 @@ from typing import Annotated
 
 import jwt
 from pydantic import BaseModel
-from fastapi import HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, Depends, APIRouter
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from passlib.context import CryptContext
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
 from settings import Settings, get_settings
 
-from .models import User
-from .db import get_engine
+from ..models import User
+from ..db import get_engine
 
+from .exceptions import CredentialsException, InvalidUsernamePassword
 
+router = APIRouter(prefix="/auth")
 pass_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -26,18 +28,6 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str
-
-
-CredentialsException = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Could not validate credentials",
-    headers={"WWW-Authenticate": "Bearer"},
-)
-InvalidUsernamePassword = HTTPException(
-    status_code=status.HTTP_401_UNAUTHORIZED,
-    detail="Invalid email or password",
-    headers={"WWW-Authenticate": "Bearer"},
-)
 
 
 def verify_passwd(plain: str, hashed: str) -> bool:
@@ -177,3 +167,23 @@ async def get_current_active_user(
         raise HTTPException(status_code=400, detail="Inactive user")
 
     return current_user
+
+
+@router.post("/token")
+async def login_for_access_token(
+    engine: Annotated[Engine, Depends(get_engine)],
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Token:
+    user = authenticate_user(engine, form_data.username, form_data.password)
+    if user is None:
+        raise InvalidUsernamePassword
+    expires_delta = timedelta(minutes=settings.token_expires_mins)
+    access_token = gen_access_token(
+        payload={"sub": user.username},
+        expires_after=expires_delta,
+        secret=settings.secret,
+        secret_alg=settings.secret_alg,
+    )
+
+    return Token(access_token=access_token, token_type="bearer")
