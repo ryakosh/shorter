@@ -5,7 +5,6 @@ import jwt
 from pydantic import BaseModel
 from fastapi import HTTPException, Depends, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from passlib.context import CryptContext
 from sqlalchemy import Engine
 from sqlmodel import Session, select
 
@@ -14,10 +13,10 @@ from settings import Settings, get_settings
 from ..models import User
 from ..db import get_engine
 
+from .hashing import verify_passwd
 from .exceptions import CredentialsException, InvalidUsernamePassword
 
 router = APIRouter(prefix="/auth")
-pass_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
@@ -28,32 +27,6 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str
-
-
-def verify_passwd(plain: str, hashed: str) -> bool:
-    """Compare a plain password against a provided hashed version.
-
-    Args:
-        plain (str): The plain passowrd to compare.
-        hashed (str): The hashed version of the password to compare against.
-
-    Returns:
-        bool: 'True' if 'hashed' is the hashed version of the 'plain', False otherwise."""
-
-    return pass_ctx.verify(plain, hashed)
-
-
-def hash_passwd(plain: str) -> str:
-    """Hash the provided password.
-
-    Args:
-        plain (str): The plain password to be hashed.
-
-    Returns:
-        str: The hashed password.
-    """
-
-    return pass_ctx.hash(plain)
 
 
 def get_user(engine: Engine, username: str) -> User | None:
