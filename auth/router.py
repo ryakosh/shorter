@@ -5,13 +5,11 @@ import jwt
 from pydantic import BaseModel
 from fastapi import HTTPException, Depends, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from sqlalchemy import Engine
 from sqlmodel import Session, select
 
-from settings import Settings, get_settings
-
+from ..settings import Settings, get_settings
 from ..models import User
-from ..db import get_engine
+from ..db import get_session
 
 from .hashing import verify_passwd
 from .exceptions import CredentialsException, InvalidUsernamePassword
@@ -29,11 +27,11 @@ class TokenData(BaseModel):
     username: str
 
 
-def get_user(engine: Engine, username: str) -> User | None:
+def get_user(session: Session, username: str) -> User | None:
     """Get user using the provided criteria.
 
     Args:
-        engine: The database engine.
+        session: The database session.
         username (str): User's username.
 
     Returns:
@@ -42,16 +40,15 @@ def get_user(engine: Engine, username: str) -> User | None:
 
     """
 
-    with Session(engine) as session:
-        user = session.exec(select(User).where(User.username == username)).first()
-        return user
+    user = session.exec(select(User).where(User.username == username)).first()
+    return user
 
 
-def authenticate_user(engine: Engine, username: str, passwd: str) -> User | None:
+def authenticate_user(session: Session, username: str, passwd: str) -> User | None:
     """Authenticate the user using the provided username and password.
 
     Args:
-        engine (Engine): The database engine.
+        session (Session): The database session.
         username (str): User's username.
         password (str): User's password.
 
@@ -60,7 +57,7 @@ def authenticate_user(engine: Engine, username: str, passwd: str) -> User | None
         None: If authentication was not successful.
     """
 
-    user = get_user(engine, username)
+    user = get_user(session, username)
 
     if user is None or verify_passwd(passwd, user.hashed_passwd):
         return None
@@ -88,14 +85,14 @@ def gen_access_token(
 
 
 async def get_current_user(
-    engine: Annotated[Engine, Depends(get_engine)],
+    session: Annotated[Session, Depends(get_session)],
     token: Annotated[str, Depends(oauth2_scheme)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> User:
     """Get the current authenticated user.
 
     Args:
-        engine (Engine): The database engine.
+        session (Session): The database session.
         token (str): User's token.
 
     Returns:
@@ -114,7 +111,7 @@ async def get_current_user(
         token_data = TokenData(username=username)
     except jwt.InvalidTokenError:
         raise CredentialsException
-    user = get_user(engine, token_data.username)
+    user = get_user(session, token_data.username)
     if user is None:
         raise CredentialsException
 
@@ -144,11 +141,11 @@ async def get_current_active_user(
 
 @router.post("/token")
 async def login_for_access_token(
-    engine: Annotated[Engine, Depends(get_engine)],
+    session: Annotated[Session, Depends(get_session)],
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Token:
-    user = authenticate_user(engine, form_data.username, form_data.password)
+    user = authenticate_user(session, form_data.username, form_data.password)
     if user is None:
         raise InvalidUsernamePassword
     expires_delta = timedelta(minutes=settings.token_expires_mins)
