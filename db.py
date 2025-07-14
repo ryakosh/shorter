@@ -11,7 +11,6 @@ engine = create_engine(
 )
 
 
-@lru_cache
 def get_session() -> Generator[Session, None]:
     """Get the database engine.
 
