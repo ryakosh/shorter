@@ -24,22 +24,20 @@ class URLCreate(URLBase):
 class UserBase(SQLModel):
     email: EmailStr
     username: str
-    hashed_passwd: Annotated[str, Field(min_length=8)]
 
 
 class User(UserBase, table=True):
     id: Annotated[int | None, Field(primary_key=True)] = None
     is_active: bool = False
+    hashed_passwd: str
 
     urls: list[URL] | None = Relationship(back_populates="user")
 
 
 class UserCreate(UserBase):
-    pass
+    passwd: Annotated[str, Field(min_length=8)]
 
 
-class UserRead(SQLModel):
+class UserRead(UserBase):
     id: int
-    username: str
-    email: str
     is_active: bool
