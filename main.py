@@ -1,15 +1,20 @@
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, FastAPI, HTTPException, status
 
 from sqlalchemy import Engine
 from sqlmodel import SQLModel, Session, select
 
+from .encoder import build_encoder
+from .settings import get_settings
+
 from .auth.hashing import hash_passwd
 
-from .models import User, UserCreate, UserRead
+from .models import URL, URLCreate, URLRead, User, UserCreate, UserRead
 from .db import get_session
+
+from . import auth
 from .auth import get_current_active_user
 
 AlreadyExistsException = HTTPException(
@@ -27,6 +32,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+encode = build_encoder(get_settings().alphabet)
+
+app.include_router(auth.router)
 
 
 @app.post("/users", status_code=status.HTTP_201_CREATED, response_model=UserRead)
@@ -47,6 +55,26 @@ def create_user(user_c: UserCreate, session: Annotated[Session, Depends(get_sess
     session.refresh(user)
 
     return user
+
+
+@app.post("/urls", status_code=status.HTTP_201_CREATED, response_model=URLRead)
+def create_url(
+    url_c: URLCreate,
+    user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    url = URL(url=str(url_c.url), user_id=cast(int, user.id))
+
+    session.add(url)
+    session.commit()
+    session.refresh(url)
+
+    url.s_url = encode(cast(int, url.id))
+
+    session.commit()
+    session.refresh(url)
+
+    return url
 
 
 @app.get("/users/me/", response_model=UserRead)
