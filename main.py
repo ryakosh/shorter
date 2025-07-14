@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from typing import Annotated, cast
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Path, status
 
+from fastapi.responses import RedirectResponse
 from sqlalchemy import Engine
 from sqlmodel import SQLModel, Session, select
 
@@ -20,6 +21,10 @@ from .auth import get_current_active_user
 AlreadyExistsException = HTTPException(
     status_code=status.HTTP_409_CONFLICT,
     detail="Already exists.",
+)
+
+NotFoundException = HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND, detail="Not found."
 )
 
 
@@ -75,6 +80,19 @@ def create_url(
     session.refresh(url)
 
     return url
+
+
+@app.get("/resolve_s_url/{s_url}")
+def resolve_s_url(
+    s_url: Annotated[str, Path(max_length=20)],
+    session: Annotated[Session, Depends(get_session)],
+):
+    url = session.exec(select(URL.url).where(URL.s_url == s_url)).one_or_none()
+
+    if url is None:
+        raise NotFoundException
+
+    return RedirectResponse(url=url)
 
 
 @app.get("/users/me/", response_model=UserRead)
