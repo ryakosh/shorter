@@ -15,7 +15,7 @@ from .hashing import verify_passwd
 from .exceptions import CredentialsException, InvalidUsernamePassword
 
 router = APIRouter(prefix="/auth")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 
 class Token(BaseModel):
@@ -58,8 +58,9 @@ def authenticate_user(session: Session, username: str, passwd: str) -> User | No
     """
 
     user = get_user(session, username)
+    print(2)
 
-    if user is None or verify_passwd(passwd, user.hashed_passwd):
+    if user is None or not verify_passwd(passwd, user.hashed_passwd):
         return None
     return user
 

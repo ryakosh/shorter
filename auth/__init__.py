@@ -1,1 +1,1 @@
-from .router import get_current_active_user
+from .router import router, get_current_active_user
