@@ -1,5 +1,4 @@
 from collections.abc import Generator
-from functools import lru_cache
 
 from sqlmodel import Session, create_engine
 
