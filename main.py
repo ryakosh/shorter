@@ -12,7 +12,7 @@ from .settings import get_settings
 
 from .auth.hashing import hash_passwd
 
-from .models import URL, URLCreate, URLRead, User, UserCreate, UserRead
+from .models import URL, Resolution, URLCreate, URLRead, User, UserCreate, UserRead
 from .db import get_session
 
 from . import auth
@@ -87,12 +87,17 @@ def resolve_s_url(
     s_url: Annotated[str, Path(max_length=20)],
     session: Annotated[Session, Depends(get_session)],
 ):
-    url = session.exec(select(URL.url).where(URL.s_url == s_url)).one_or_none()
+    url = session.exec(select(URL).where(URL.s_url == s_url)).one_or_none()
 
     if url is None:
         raise NotFoundException
 
-    return RedirectResponse(url=url)
+    resolution = Resolution(url_id=cast(int, url.id))
+
+    session.add(resolution)
+    session.commit()
+
+    return RedirectResponse(url=url.url)
 
 
 @app.get("/users/me/", response_model=UserRead)

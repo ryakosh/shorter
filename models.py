@@ -1,7 +1,12 @@
+from datetime import datetime, timezone
 from typing import Annotated
 
 from pydantic import EmailStr, HttpUrl
 from sqlmodel import Field, Relationship, SQLModel
+
+
+def current_utc_time():
+    return datetime.now(timezone.utc)
 
 
 class URLBase(SQLModel):
@@ -15,6 +20,7 @@ class URL(URLBase, table=True):
 
     user_id: Annotated[int, Field(foreign_key="user.id")]
     user: "User" = Relationship(back_populates="urls")
+    resolutions: "Resolution" = Relationship(back_populates="url")
 
 
 class URLCreate(SQLModel):
@@ -25,6 +31,14 @@ class URLRead(URLBase):
     id: int
     s_url: str
     user_id: int
+
+
+class Resolution(SQLModel, table=True):
+    id: Annotated[int | None, Field(primary_key=True)] = None
+    timestamp: datetime = Field(default_factory=current_utc_time)
+
+    url_id: Annotated[int, Field(foreign_key="url.id")]
+    url: URL = Relationship(back_populates="resolutions")
 
 
 class UserBase(SQLModel):
